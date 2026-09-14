@@ -139,27 +139,8 @@ type CameraDevice = {
 };
 type SpeechStatus = "unsupported" | "blocked" | "ready" | "loading";
 type MlStatus = "checking" | "connected" | "degraded" | "unavailable";
-type TutorialTarget =
-  | "start-session"
-  | "camera-stage"
-  | "posture-score"
-  | "session-log"
-  | "settings-panel";
-type TutorialStep = {
-  target: TutorialTarget;
-  title: string;
-  body: string;
-};
 type GuidedTrialStepId = TutorialVisualKind;
 type GuidedTrialStep = TutorialOverlayStep;
-type TutorialRect = {
-  top: number;
-  left: number;
-  right: number;
-  bottom: number;
-  width: number;
-  height: number;
-};
 type DebugMetrics = {
   chinCenterOffset: number;
   chinForwardLean: number;
@@ -203,7 +184,6 @@ const VIS_THRESHOLD = 0.35;
 const DRAW_VIS_THRESHOLD = 0.12;
 const HOLD_STILL_MS = 300;
 const RF_CORE_VISIBILITY = 0.5;
-const PREDICTION_INITIAL_SAMPLES = 2;
 const PREDICTION_TRANSITION_SAMPLES = 3;
 const PREDICTION_CONFIRMATION_MS = 1200;
 const ACTIVITY_STATE_COOLDOWN_MS = 12000;
@@ -225,7 +205,6 @@ const CHIN_LIFT_PROXY_THRESHOLD = 0.95;
 const CHIN_LIFT_PROXY_SEVERE = 1.15;
 const UPPER_FRONT_FRAME_MARGIN = 0.08;
 const THEME_STORAGE_KEY = "sukatlikod-theme";
-const TUTORIAL_SEEN_STORAGE_KEY = "uprightly-tutorial-seen";
 const PRIVACY_NOTICE_STORAGE_KEY = "uprightly-privacy-notice";
 const FLOATING_WINDOW_STORAGE_KEY = "uprightly-auto-floating-window-v2";
 const GUIDED_TRIAL_STORAGE_KEY = "uprightly-guided-trial-seen-v1";
@@ -252,68 +231,41 @@ const DEFAULT_DEBUG_METRICS: DebugMetrics = {
   upperForwardLean: 0,
   upperShoulderTilt: 0,
 };
-const TUTORIAL_STEPS: TutorialStep[] = [
-  {
-    target: "start-session",
-    title: "Begin when you're ready",
-    body: "Start Session opens your camera and begins live posture guidance. The same control ends the session whenever you need a break.",
-  },
-  {
-    target: "camera-stage",
-    title: "Frame your upper body",
-    body: "Keep your head and shoulders visible inside the guide. A steady, front-facing view gives Uprightly the clearest posture signal.",
-  },
-  {
-    target: "posture-score",
-    title: "Read the overall signal",
-    body: "The score summarizes your current posture. The supporting measurements show whether your head, trunk, or shoulders need attention.",
-  },
-  {
-    target: "session-log",
-    title: "Notice patterns, not moments",
-    body: "The session log collects meaningful posture changes so you can follow the pattern without reacting to every small movement.",
-  },
-  {
-    target: "settings-panel",
-    title: "Tune the experience",
-    body: "Choose your camera and theme, manage voice feedback, replay this tour, or keep status visible in a floating window.",
-  },
-];
 const GUIDED_TRIAL_STEPS: GuidedTrialStep[] = [
   {
     id: "baseline",
-    title: "Sit in your starting posture",
+    title: "Show the eight-point frame",
     instruction:
-      "Sit comfortably upright. Center your face and keep both shoulders visible, then hold still.",
-    expected: "Stable tracking and a starting reference.",
+      "Center your face and keep both ears and shoulders visible. Hold still while Uprightly reads the eight landmark measurements.",
+    expected: "The cyan eight-point guide appears and a posture category is returned.",
   },
   {
     id: "forward",
-    title: "Lean slightly forward",
+    title: "Try a gentle posture change",
     instruction:
-      "Move your head and upper body slightly toward the camera, then hold that position.",
-    expected: "Bring your head back or Sit straighter.",
+      "Lean slightly forward, then pause. Keep the complete eight-point guide in view.",
+    expected: "Watch the Current posture card for a model category change.",
   },
   {
     id: "shoulders",
-    title: "Raise one shoulder",
+    title: "Try a small shoulder tilt",
     instruction:
-      "Raise either shoulder slightly while keeping both shoulders inside the frame.",
-    expected: "Level your shoulders.",
+      "Raise either shoulder slightly, then hold the pose while all eight points remain visible.",
+    expected: "Watch the Current posture card for a model category change.",
   },
   {
     id: "framing",
-    title: "Move partly out of frame",
+    title: "Test the capture boundary",
     instruction:
-      "Turn slightly or move until one shoulder is partly outside the camera frame.",
-    expected: "Uprightly asks you to face the camera or keep both shoulders visible.",
+      "Move until an ear or shoulder is partly outside the camera frame.",
+    expected: "The model pauses until the complete eight-point guide returns.",
   },
   {
     id: "neutral",
-    title: "Return to your starting posture",
+    title: "Return to a centered posture",
     instruction:
-      "Sit comfortably upright again and hold still while the reading settles.",
-    expected: "The posture score and guidance recover.",
+      "Sit comfortably upright again, center your face, and hold still while the reading settles.",
+    expected: "Neutral Posture appears if the model classifies the frame as balanced.",
   },
   {
     id: "floating",
@@ -329,46 +281,6 @@ type SideKind = "left" | "right";
 function pushLimited(arr: number[], x: number) {
   arr.push(x);
   if (arr.length > WINDOW) arr.shift();
-}
-
-function findVisibleTourElement(target: TutorialTarget): HTMLElement | null {
-  if (typeof document === "undefined") return null;
-
-  const elements = Array.from(
-    document.querySelectorAll<HTMLElement>(`[data-tour="${target}"]`),
-  );
-
-  for (const element of elements) {
-    const rect = element.getBoundingClientRect();
-    const style = window.getComputedStyle(element);
-    const isVisible =
-      rect.width > 0 &&
-      rect.height > 0 &&
-      style.display !== "none" &&
-      style.visibility !== "hidden" &&
-      style.opacity !== "0";
-
-    if (isVisible) {
-      return element;
-    }
-  }
-
-  return null;
-}
-
-function findVisibleTourTarget(target: TutorialTarget): TutorialRect | null {
-  const element = findVisibleTourElement(target);
-  if (!element) return null;
-
-  const rect = element.getBoundingClientRect();
-  return {
-    top: rect.top,
-    left: rect.left,
-    right: rect.right,
-    bottom: rect.bottom,
-    width: rect.width,
-    height: rect.height,
-  };
 }
 
 function vsub(a: Point3, b: Point3) {
@@ -769,18 +681,10 @@ function DesktopApp() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const sessionLogStackRef = useRef<HTMLDivElement | null>(null);
-  const tutorialCardRef = useRef<HTMLDivElement | null>(null);
-  const tutorialContentRef = useRef<HTMLDivElement | null>(null);
-  const tutorialReturnFocusRef = useRef<HTMLElement | null>(null);
   const purposeNoticeRef = useRef<HTMLElement | null>(null);
   const privacyNoticeRef = useRef<HTMLElement | null>(null);
   const privacyPolicyRef = useRef<HTMLDivElement | null>(null);
   const privacyReturnFocusRef = useRef<HTMLElement | null>(null);
-  const tutorialPanelStateRef = useRef({
-    showSettings: false,
-    showSessionLog: false,
-  });
-
   const poseRef = useRef<PoseLandmarker | null>(null);
   const faceRef = useRef<FaceLandmarker | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -794,6 +698,8 @@ function DesktopApp() {
   } | null>(null);
   const predictionCandidateRef = useRef<PredictionCandidate | null>(null);
   const confirmedModelStateRef = useRef<ModelPostureState | null>(null);
+  const guidedTrialEntryStateRef = useRef<ModelPostureState | null>(null);
+  const latestModelStateRef = useRef<ModelPostureState | null>(null);
   const lastSpokenMessageRef = useRef<string>("");
   const lastInferTsRef = useRef<number>(0);
   const inferInFlightRef = useRef<boolean>(false);
@@ -869,21 +775,6 @@ function DesktopApp() {
   >("purpose");
   const [rememberPrivacyNotice, setRememberPrivacyNotice] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return (
-      hasAcknowledgedPrivacyNotice() &&
-      window.localStorage.getItem(TUTORIAL_SEEN_STORAGE_KEY) !== "true"
-    );
-  });
-  const [tutorialStepIndex, setTutorialStepIndex] = useState(0);
-  const [tutorialTargetRect, setTutorialTargetRect] =
-    useState<TutorialRect | null>(null);
-  const [tutorialCardSize, setTutorialCardSize] = useState({
-    width: 384,
-    height: 320,
-  });
-  const [isCompactTutorial, setIsCompactTutorial] = useState(false);
   const [showGuidedTrial, setShowGuidedTrial] = useState(false);
   const [guidedTrialPending, setGuidedTrialPending] = useState(false);
   const [guidedTrialStepIndex, setGuidedTrialStepIndex] = useState(0);
@@ -916,6 +807,10 @@ function DesktopApp() {
   const [feedback, setFeedback] = useState("Press Start Session to begin.");
   const [confirmedFeedback, setConfirmedFeedback] = useState("");
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
+
+  useEffect(() => {
+    latestModelStateRef.current = mlPostureState;
+  }, [mlPostureState]);
 
   const [, setMetrics] = useState({
     trunkAngle: 0,
@@ -1462,6 +1357,36 @@ function DesktopApp() {
             ? "mild"
             : "severe";
       const now = Date.now();
+      const confirmed = confirmedModelStateRef.current;
+
+      // A valid first model result should feel immediate. Confirmation is only
+      // needed after the user already has a visible state, where it prevents a
+      // brief change in the frame from making the UI flicker.
+      if (!confirmed) {
+        confirmedModelStateRef.current = state;
+        predictionCandidateRef.current = null;
+        setMlPostureState(state);
+        setScore(pred.score);
+        setFeedback(pred.feedback);
+        setConfirmedFeedback(pred.feedback);
+        setPill(state === "neutral" ? "good" : "fix");
+        speakFeedback(
+          state === "neutral" ? "good" : "fix",
+          pred.feedback,
+          `random-forest-${pred.label}`,
+        );
+        pushFeedback(
+          pred.score,
+          pred.feedback,
+          0,
+          0,
+          null,
+          sensitivity.headDistance,
+          state,
+        );
+        return;
+      }
+
       const candidate = predictionCandidateRef.current;
       const nextCandidate: PredictionCandidate =
         candidate?.state === state
@@ -1478,7 +1403,6 @@ function DesktopApp() {
             };
       predictionCandidateRef.current = nextCandidate;
 
-      const confirmed = confirmedModelStateRef.current;
       if (confirmed === state) {
         setScore(pred.score);
         setFeedback(pred.feedback);
@@ -1487,11 +1411,8 @@ function DesktopApp() {
         return;
       }
 
-      const requiredSamples = confirmed
-        ? PREDICTION_TRANSITION_SAMPLES
-        : PREDICTION_INITIAL_SAMPLES;
       const isStable =
-        nextCandidate.samples >= requiredSamples &&
+        nextCandidate.samples >= PREDICTION_TRANSITION_SAMPLES &&
         now - nextCandidate.firstSeenAt >= PREDICTION_CONFIRMATION_MS;
       if (!isStable) return;
 
@@ -2515,6 +2436,7 @@ function DesktopApp() {
     window.localStorage.setItem(GUIDED_TRIAL_STORAGE_KEY, "true");
     setCompletedGuidedTrialSteps(new Set());
     setGuidedTrialStepIndex(0);
+    guidedTrialEntryStateRef.current = latestModelStateRef.current;
     setGuidedTrialPending(false);
     setShowGuidedTrial(true);
     setShowSettings(false);
@@ -2523,10 +2445,12 @@ function DesktopApp() {
 
   const finishGuidedTrial = useCallback(() => {
     window.localStorage.setItem(GUIDED_TRIAL_STORAGE_KEY, "true");
+    guidedTrialEntryStateRef.current = null;
     setShowGuidedTrial(false);
   }, []);
 
   const goToPreviousGuidedTrialStep = useCallback(() => {
+    guidedTrialEntryStateRef.current = latestModelStateRef.current;
     setGuidedTrialStepIndex((index) => Math.max(0, index - 1));
   }, []);
 
@@ -2535,6 +2459,7 @@ function DesktopApp() {
       finishGuidedTrial();
       return;
     }
+    guidedTrialEntryStateRef.current = latestModelStateRef.current;
     setGuidedTrialStepIndex((index) => index + 1);
   }, [finishGuidedTrial, guidedTrialStepIndex]);
 
@@ -2550,6 +2475,19 @@ function DesktopApp() {
     setGuidedTrialPending(true);
     void start();
   }, [beginGuidedTrial, isActive, start]);
+
+  const startSession = useCallback(() => {
+    // The Tutorial is the sole first-run orientation. Camera access still
+    // begins from this user gesture, so the browser can grant permission.
+    if (
+      typeof window !== "undefined" &&
+      window.localStorage.getItem(GUIDED_TRIAL_STORAGE_KEY) !== "true"
+    ) {
+      requestGuidedTrial();
+      return;
+    }
+    void start();
+  }, [requestGuidedTrial, start]);
 
   useEffect(() => {
     if (!guidedTrialPending) return;
@@ -2576,19 +2514,16 @@ function DesktopApp() {
     const stepId = GUIDED_TRIAL_STEPS[guidedTrialStepIndex]?.id;
     if (!stepId || completedGuidedTrialSteps.has(stepId)) return;
 
-    const normalizedFeedback = feedback.toLowerCase();
+    const categoryChanged =
+      mlPostureState !== null &&
+      (guidedTrialEntryStateRef.current === null ||
+        mlPostureState !== guidedTrialEntryStateRef.current);
     const detected =
-      (stepId === "baseline" && trackingHealth >= 45) ||
-      (stepId === "forward" &&
-        (normalizedFeedback.includes("head back") ||
-          normalizedFeedback.includes("sit straighter"))) ||
-      (stepId === "shoulders" &&
-        normalizedFeedback.includes("level your shoulders")) ||
-      (stepId === "framing" &&
-        (normalizedFeedback.includes("face the camera") ||
-          normalizedFeedback.includes("shoulders in view") ||
-          normalizedFeedback.includes("shoulders visible"))) ||
-      (stepId === "neutral" && pill === "good" && score >= 80) ||
+      (stepId === "baseline" && mlPostureState !== null) ||
+      ((stepId === "forward" || stepId === "shoulders") &&
+        categoryChanged) ||
+      (stepId === "framing" && trackingHealth < 45) ||
+      (stepId === "neutral" && mlPostureState === "neutral") ||
       (stepId === "floating" && floatingWindowReady);
 
     if (!detected) return;
@@ -2602,11 +2537,9 @@ function DesktopApp() {
     return () => window.clearTimeout(detectedTimer);
   }, [
     completedGuidedTrialSteps,
-    feedback,
     floatingWindowReady,
     guidedTrialStepIndex,
-    pill,
-    score,
+    mlPostureState,
     showGuidedTrial,
     trackingHealth,
   ]);
@@ -2720,9 +2653,6 @@ function DesktopApp() {
     }
 
     setShowPrivacyNotice(false);
-    if (window.localStorage.getItem(TUTORIAL_SEEN_STORAGE_KEY) !== "true") {
-      window.setTimeout(() => setShowTutorial(true), 0);
-    }
   }, [rememberPrivacyNotice]);
 
   const continueToPrivacyNotice = useCallback(() => {
@@ -2838,7 +2768,6 @@ function DesktopApp() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (
-        showTutorial ||
         showGuidedTrial ||
         showPrivacyNotice ||
         showPrivacyPolicy ||
@@ -2861,7 +2790,7 @@ function DesktopApp() {
       e.preventDefault();
       if (pill === "loading") return;
       if (isActive) stop();
-      else void start();
+      else startSession();
     };
 
     window.addEventListener("keydown", onKeyDown);
@@ -2872,8 +2801,7 @@ function DesktopApp() {
     showPrivacyNotice,
     showPrivacyPolicy,
     showGuidedTrial,
-    showTutorial,
-    start,
+    startSession,
     stop,
   ]);
 
@@ -2937,241 +2865,9 @@ function DesktopApp() {
     },
   );
 
-  const currentTutorialStep = TUTORIAL_STEPS[tutorialStepIndex];
   const currentGuidedTrialStep = GUIDED_TRIAL_STEPS[guidedTrialStepIndex];
   const currentGuidedTrialDetected = completedGuidedTrialSteps.has(
     currentGuidedTrialStep.id,
-  );
-
-  const closeTutorial = useCallback(() => {
-    window.localStorage.setItem(TUTORIAL_SEEN_STORAGE_KEY, "true");
-    setShowTutorial(false);
-    setShowSettings(tutorialPanelStateRef.current.showSettings);
-    setShowSessionLog(tutorialPanelStateRef.current.showSessionLog);
-  }, []);
-
-  const goToNextTutorialStep = useCallback(() => {
-    if (tutorialStepIndex >= TUTORIAL_STEPS.length - 1) {
-      closeTutorial();
-      return;
-    }
-    setTutorialStepIndex((index) => index + 1);
-  }, [closeTutorial, tutorialStepIndex]);
-
-  const goToPreviousTutorialStep = useCallback(() => {
-    setTutorialStepIndex((index) => Math.max(index - 1, 0));
-  }, []);
-
-  useEffect(() => {
-    if (!showTutorial) return;
-
-    if (currentTutorialStep.target === "settings-panel") {
-      setShowSettings(true);
-      setShowSessionLog(false);
-    } else if (currentTutorialStep.target === "session-log") {
-      setShowSettings(false);
-      setShowSessionLog(true);
-    } else {
-      setShowSettings(false);
-      setShowSessionLog(false);
-    }
-  }, [currentTutorialStep.target, showTutorial]);
-
-  useEffect(() => {
-    if (!showTutorial) return;
-
-    const mediaQuery = window.matchMedia(
-      "(max-width: 639px), (max-height: 680px)",
-    );
-    const updateViewportMode = () => setIsCompactTutorial(mediaQuery.matches);
-    updateViewportMode();
-    mediaQuery.addEventListener("change", updateViewportMode);
-    return () => mediaQuery.removeEventListener("change", updateViewportMode);
-  }, [showTutorial]);
-
-  useEffect(() => {
-    if (!showTutorial || !tutorialCardRef.current) return;
-
-    const observer = new ResizeObserver(([entry]) => {
-      if (!entry) return;
-      setTutorialCardSize({
-        width: entry.borderBoxSize?.[0]?.inlineSize ?? entry.contentRect.width,
-        height: entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height,
-      });
-    });
-    observer.observe(tutorialCardRef.current);
-    return () => observer.disconnect();
-  }, [showTutorial, tutorialStepIndex]);
-
-  useEffect(() => {
-    if (!showTutorial) {
-      setTutorialTargetRect(null);
-      return;
-    }
-
-    let frame = 0;
-
-    const measure = () => {
-      window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => {
-        setTutorialTargetRect(
-          findVisibleTourTarget(currentTutorialStep.target),
-        );
-      });
-    };
-
-    const targetElement = findVisibleTourElement(currentTutorialStep.target);
-    if (targetElement) {
-      const targetRect = targetElement.getBoundingClientRect();
-      const isOutsideViewport =
-        targetRect.top < 12 || targetRect.bottom > window.innerHeight - 12;
-      if (isOutsideViewport) {
-        targetElement.scrollIntoView({
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "auto"
-            : "smooth",
-          block: "nearest",
-          inline: "nearest",
-        });
-      }
-    }
-
-    measure();
-    const deferredMeasure = window.setTimeout(measure, 280);
-
-    window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, true);
-
-    return () => {
-      window.clearTimeout(deferredMeasure);
-      window.cancelAnimationFrame(frame);
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure, true);
-    };
-  }, [currentTutorialStep.target, showSettings, showSessionLog, showTutorial]);
-
-  useEffect(() => {
-    if (!showTutorial) return;
-
-    if (!tutorialReturnFocusRef.current) {
-      tutorialReturnFocusRef.current =
-        document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
-    }
-
-    const focusFrame = window.requestAnimationFrame(() => {
-      tutorialCardRef.current
-        ?.querySelector<HTMLElement>("[data-tutorial-primary]")
-        ?.focus();
-    });
-
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      const returnTarget = tutorialReturnFocusRef.current;
-      tutorialReturnFocusRef.current = null;
-      window.requestAnimationFrame(() => returnTarget?.focus());
-    };
-  }, [showTutorial]);
-
-  useEffect(() => {
-    const onTransientKeyDown = (event: KeyboardEvent) => {
-      if (showPrivacyNotice || showPrivacyPolicy) return;
-
-      if (!showTutorial) {
-        if (event.key !== "Escape") return;
-        if (showSettings) setShowSettings(false);
-        else if (showSessionLog) setShowSessionLog(false);
-        return;
-      }
-
-      if (event.repeat) return;
-      const target = event.target as HTMLElement | null;
-      const isEditable =
-        target?.matches("input, textarea, select, [contenteditable='true']") ??
-        false;
-
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeTutorial();
-        return;
-      }
-
-      if (event.key === "Tab") {
-        const focusable = Array.from(
-          tutorialCardRef.current?.querySelectorAll<HTMLElement>(
-            "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
-          ) ?? [],
-        );
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
-        return;
-      }
-
-      if (isEditable) return;
-
-      if (event.key === "ArrowLeft") {
-        event.preventDefault();
-        goToPreviousTutorialStep();
-        return;
-      }
-
-      const isSpace = event.code === "Space" || event.key === " ";
-      if (isSpace && target?.closest("button, a, [role='button']")) return;
-
-      if (event.key === "ArrowRight" || isSpace) {
-        event.preventDefault();
-        goToNextTutorialStep();
-      }
-    };
-
-    window.addEventListener("keydown", onTransientKeyDown);
-    return () => window.removeEventListener("keydown", onTransientKeyDown);
-  }, [
-    closeTutorial,
-    goToNextTutorialStep,
-    goToPreviousTutorialStep,
-    showPrivacyNotice,
-    showPrivacyPolicy,
-    showSessionLog,
-    showSettings,
-    showTutorial,
-  ]);
-
-  useGSAP(
-    () => {
-      if (
-        !showTutorial ||
-        !tutorialContentRef.current ||
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ) {
-        return;
-      }
-
-      gsap.fromTo(
-        tutorialContentRef.current.querySelectorAll("[data-tutorial-reveal]"),
-        { autoAlpha: 0, y: 10 },
-        {
-          autoAlpha: 1,
-          y: 0,
-          duration: 0.36,
-          stagger: 0.055,
-          ease: "power2.out",
-        },
-      );
-    },
-    {
-      dependencies: [showTutorial, tutorialStepIndex],
-      scope: tutorialCardRef,
-    },
   );
 
   useGSAP(
@@ -3306,97 +3002,6 @@ function DesktopApp() {
         : autoPipStatus === "blocked"
           ? "Available manually, but automatic opening is currently blocked."
           : "Not supported here. Try a Chromium browser over HTTPS.";
-  const tutorialCardWidth =
-    typeof window === "undefined" ? 384 : Math.min(384, window.innerWidth - 24);
-  const tutorialHighlightStyle: CSSProperties | undefined = tutorialTargetRect
-    ? {
-        top: tutorialTargetRect.top - 10,
-        left: tutorialTargetRect.left - 10,
-        width: tutorialTargetRect.width + 20,
-        height: tutorialTargetRect.height + 20,
-      }
-    : undefined;
-  const tutorialCardStyle: CSSProperties = (() => {
-    if (typeof window === "undefined") {
-      return { width: tutorialCardWidth, left: 16, top: 16 };
-    }
-
-    if (isCompactTutorial) {
-      return {
-        width: tutorialCardWidth,
-        left: Math.max(12, (window.innerWidth - tutorialCardWidth) / 2),
-        bottom: 12,
-        maxHeight: "calc(100dvh - 24px)",
-        overflowY: "auto",
-      };
-    }
-
-    if (tutorialTargetRect) {
-      return (() => {
-          const gap = 18;
-          const cardHeight = Math.max(280, tutorialCardSize.height);
-          const viewportPadding = 16;
-          const viewportWidth = window.innerWidth;
-          const viewportHeight = window.innerHeight;
-          const fitsRight =
-            tutorialTargetRect.right + gap + tutorialCardWidth <=
-            viewportWidth - viewportPadding;
-          const fitsLeft =
-            tutorialTargetRect.left - gap - tutorialCardWidth >=
-            viewportPadding;
-          const fitsBelow =
-            tutorialTargetRect.bottom + gap + cardHeight <=
-            viewportHeight - viewportPadding;
-          const fitsAbove =
-            tutorialTargetRect.top - gap - cardHeight >= viewportPadding;
-
-          let left = clamp(
-            tutorialTargetRect.left,
-            viewportPadding,
-            viewportWidth - tutorialCardWidth - viewportPadding,
-          );
-          let top = clamp(
-            tutorialTargetRect.bottom + gap,
-            viewportPadding,
-            viewportHeight - cardHeight - viewportPadding,
-          );
-
-          if (fitsRight || fitsLeft) {
-            left = fitsRight
-              ? tutorialTargetRect.right + gap
-              : tutorialTargetRect.left - tutorialCardWidth - gap;
-            top = clamp(
-              tutorialTargetRect.top +
-                tutorialTargetRect.height / 2 -
-                cardHeight / 2,
-              viewportPadding,
-              viewportHeight - cardHeight - viewportPadding,
-            );
-          } else if (fitsBelow || fitsAbove) {
-            top = fitsBelow
-              ? tutorialTargetRect.bottom + gap
-              : tutorialTargetRect.top - cardHeight - gap;
-            left = clamp(
-              tutorialTargetRect.left,
-              viewportPadding,
-              viewportWidth - tutorialCardWidth - viewportPadding,
-            );
-          }
-
-          return {
-            width: tutorialCardWidth,
-            left,
-            top,
-          };
-        })();
-    }
-
-    return {
-      width: tutorialCardWidth,
-      left: Math.max(16, (window.innerWidth - tutorialCardWidth) / 2),
-      top: Math.max(16, (window.innerHeight - tutorialCardSize.height) / 2),
-    };
-  })();
   const visibleFeedbacks = feedbacks.slice(-5).reverse();
   const isSessionLogIdle = !isActive && feedbacks.length === 0;
 
@@ -3425,7 +3030,7 @@ function DesktopApp() {
             </div>
 
             <button
-              onClick={isActive ? stop : () => void start()}
+              onClick={isActive ? stop : startSession}
               disabled={isLoading}
               data-tour="start-session"
               className={`w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-full font-semibold transition-all ${isActive ? "bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30" : primaryButtonClass} ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
@@ -3533,7 +3138,7 @@ function DesktopApp() {
                     Activity
                   </button>
                   <button
-                    onClick={isActive ? stop : () => void start()}
+                    onClick={isActive ? stop : startSession}
                     disabled={isLoading}
                     data-tour="start-session"
                     className={`flex min-h-11 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all lg:hidden ${isActive ? "bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30" : primaryButtonClass} ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
@@ -3715,7 +3320,7 @@ function DesktopApp() {
                             begins.
                           </p>
                           <button
-                            onClick={() => void start()}
+                            onClick={startSession}
                             disabled={isLoading}
                             className={`mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--uprightly-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${primaryButtonClass} ${
                               isLoading ? "cursor-not-allowed opacity-50" : ""
@@ -4713,146 +4318,6 @@ function DesktopApp() {
         </div>
       ) : null}
 
-      {showTutorial ? (
-        <div className="pointer-events-none fixed inset-0 z-50">
-          {tutorialHighlightStyle ? (
-            <div
-              className="fixed rounded-[1.75rem] border-2 transition-all duration-300 motion-reduce:transition-none"
-              style={{
-                ...tutorialHighlightStyle,
-                borderColor: accentColor,
-                boxShadow: `0 0 0 9999px ${isDarkTheme ? "rgba(16, 16, 15, 0.82)" : "rgba(242, 239, 231, 0.84)"}`,
-              }}
-              aria-hidden="true"
-            />
-          ) : (
-            <div
-              className={`fixed inset-0 backdrop-blur-md ${tutorialOverlayClass}`}
-              aria-hidden="true"
-            />
-          )}
-
-          <div
-            ref={tutorialCardRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="tutorial-title"
-            aria-describedby="tutorial-description tutorial-keyboard-hint"
-            className={`pointer-events-auto fixed rounded-[1.75rem] border p-5 shadow-[0_28px_90px_-28px_rgba(0,0,0,0.65)] transition-[left,top,bottom] duration-300 motion-reduce:transition-none sm:p-6 ${isDarkTheme ? "border-white/12 bg-[#171715] text-[#f4f0e8]" : "border-[#ded8cc] bg-[#fffdf8] text-[#1c1b19]"}`}
-            style={tutorialCardStyle}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div
-                className={`flex items-center gap-2 text-sm font-semibold ${
-                  isDarkTheme ? "text-[#e8e7e2]" : "text-[#0A3A72]"
-                }`}
-              >
-                <span className={`flex h-9 w-9 items-center justify-center rounded-full border ${accentSoftClass}`}>
-                  <BookOpen size={16} aria-hidden="true" />
-                </span>
-                Quick tour
-              </div>
-              <button
-                onClick={closeTutorial}
-                className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${isDarkTheme ? "border-white/15 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white" : "border-[#ded8cc] bg-white text-[#6f6a61] hover:bg-[#f2efe7] hover:text-[#1c1b19]"}`}
-                aria-label="Close quick tour"
-                title="Skip quick tour"
-              >
-                <X size={18} aria-hidden="true" />
-              </button>
-            </div>
-
-            <div ref={tutorialContentRef} key={tutorialStepIndex}>
-              <div
-                data-tutorial-reveal
-                className={`mt-5 text-xs font-semibold ${mutedTextClass}`}
-              >
-                {tutorialStepIndex + 1} / {TUTORIAL_STEPS.length}
-              </div>
-              <h2
-                id="tutorial-title"
-                data-tutorial-reveal
-                className="mt-2 max-w-5xl text-2xl font-bold leading-tight tracking-[-0.025em]"
-              >
-                {currentTutorialStep.title}
-              </h2>
-              <p
-                id="tutorial-description"
-                data-tutorial-reveal
-                className={`mt-3 text-[0.9375rem] leading-6 ${quietTextClass}`}
-              >
-                {currentTutorialStep.body}
-              </p>
-            </div>
-
-            <p
-              id="tutorial-keyboard-hint"
-              className={`mt-5 rounded-xl border px-3 py-2 text-xs ${
-                isDarkTheme
-                  ? "border-white/10 bg-black/20 text-white/60"
-                  : "border-[#e5dfd4] bg-[#f6f2ea] text-[#6f6a61]"
-              }`}
-            >
-              Space / → Next · ← Back · Esc Skip
-            </p>
-
-            <div className="mt-4 flex items-center justify-center">
-              <div className="flex items-center" aria-label="Quick tour progress">
-                {TUTORIAL_STEPS.map((step, index) => (
-                  <button
-                    key={step.target}
-                    onClick={() => setTutorialStepIndex(index)}
-                    className="group flex h-11 w-11 items-center justify-center rounded-full"
-                    aria-label={`Go to tutorial step ${index + 1}`}
-                    aria-current={index === tutorialStepIndex ? "step" : undefined}
-                  >
-                    <span
-                      className={`block h-2.5 rounded-full transition-all duration-300 ${
-                        index === tutorialStepIndex
-                          ? isDarkTheme
-                            ? "w-7 bg-[#e8e7e2]"
-                            : "w-7 bg-[#0A3A72]"
-                          : isDarkTheme
-                            ? "w-2.5 bg-white/25 group-hover:bg-white/45"
-                            : "w-2.5 bg-[#c9c2b6] group-hover:bg-[#938b80]"
-                      }`}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                onClick={goToPreviousTutorialStep}
-                disabled={tutorialStepIndex === 0}
-                className={`min-h-11 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                  tutorialStepIndex === 0
-                    ? "cursor-not-allowed opacity-40"
-                    : isDarkTheme
-                      ? "border-white/15 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
-                      : "border-[#ded8cc] bg-white text-[#47433d] hover:bg-[#f2efe7] hover:text-[#1c1b19]"
-                }`}
-              >
-                Back
-              </button>
-              <button
-                data-tutorial-primary
-                onClick={goToNextTutorialStep}
-                className={`min-h-11 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${primaryButtonClass}`}
-              >
-                {tutorialStepIndex === TUTORIAL_STEPS.length - 1
-                  ? "Finish"
-                  : "Next"}
-              </button>
-            </div>
-
-            <div className="sr-only" aria-live="polite" aria-atomic="true">
-              Quick tour step {tutorialStepIndex + 1} of {TUTORIAL_STEPS.length}: {currentTutorialStep.title}
-            </div>
-          </div>
-        </div>
-      ) : null}
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {feedback}. Backend status: {mlStatusLabel}.
       </div>

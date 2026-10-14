@@ -46,4 +46,10 @@ VITE_ML_API_URL=http://127.0.0.1:8000
 
 ## Skills
 
-Repo-specific skills live under [`skills/`](c:/Users/Aryiel Joshua/OneDrive/Desktop/SukatLikod/skills). Start with [skills/INDEX.md](c:/Users/Aryiel Joshua/OneDrive/Desktop/SukatLikod/skills/INDEX.md) to see which skill to use for a given task.
+Repo-specific skills live under [`skills/`](skills/). Start with [skills/INDEX.md](skills/INDEX.md) to see which skill to use for a given task.
+
+## Data and model
+
+The tracked CSV files in `backend/data/` contain numeric posture features and labels. The active inference artifact is `backend/model/uprightly_random_forest_final.joblib`. Keep participant photos, videos, identifying records, and private dataset exports outside the repository. Check consent and source licenses before publishing new training data.
+
+The current prototype evaluates front-view posture only. It is a software demonstration, not a medical diagnosis tool.

@@ -1,123 +1,43 @@
-# SukatLikod: System Architecture and Process
+# Uprightly: system architecture and model integration
 
-## 1. Overview
+## Live prediction path
 
-SukatLikod has two connected layers:
+1. The React app captures webcam frames locally and runs MediaPipe pose and face landmarkers in the browser (`src/App.tsx`).
+2. It builds eight normalized points: nose, chin, both eye midpoints, both ears, and both shoulders.
+3. `src/features/posture/randomForestFeatures.ts` validates those points and calculates the 35 features of `uprightly_8point_v1`.
+4. The app sends those numbers, not the image, as JSON to `POST /predict` (`src/App.tsx`).
+5. `backend/api.py` validates the request, orders the features, and calls the saved scikit-learn pipeline. The pipeline contains a median imputer followed by a 300-tree Random Forest.
+6. The API returns `label`, `confidence`, `probabilities`, a probability-derived `score`, and brief `feedback`. The app displays and stabilizes the result.
 
-- **Frontend (React + MediaPipe)**: captures webcam posture data, computes features, and displays real-time feedback.
-- **Backend (Python + FastAPI + scikit-learn)**: receives features, runs ML prediction, and returns posture classification + guidance.
+The three model labels are `neutral_posture`, `mild_asymmetry`, and `severe_misalignment`. `GET /health` reports whether the API process is available; model and manifest validation occurs during startup.
 
-Think of it as:
+## Active model and provenance
 
-- Frontend = **sensor + dashboard**
-- Backend = **ML decision engine**
+- Artifact: `backend/model/uprightly_random_forest_python_original_data.joblib`
+- Manifest: `backend/model/uprightly_random_forest_python_original_data_manifest.json`
+- Training: a separate Python retraining on 666 original corrected development images. This is not a binary conversion of the RapidMiner `.rmmodel`.
+- Held-out evaluation: 261 images from separate participants; accuracy 76.245%, macro F1 56.023%. Neutral-posture recall was 2/21 (9.52%).
+- Runtime: `backend/requirements.txt` pins scikit-learn 1.9.1 and joblib 1.6.0, the versions recorded with the artifact.
 
-## 2. Frontend Responsibilities
+The held-out image evaluation does not measure webcam performance. The live browser uses MediaPipe task models, while the training feature extraction used MediaPipe Python solutions. The 35 formulas and landmark definitions align, but this difference can affect the values seen by the classifier. Real-session validation remains necessary.
 
-The frontend:
+The legacy `backend/train.py` trains a different, older feature schema. It is not the source of the active model.
 
-1. Opens webcam stream.
-2. Guides the user into a front-facing capture.
-3. Runs MediaPipe Pose to get body landmarks.
-4. Computes posture features:
-   - `trunk_angle`
-   - `head_forward`
-   - `shoulder_tilt`
-   - `trunk_variance`
-5. Sends these required features to backend `/predict`.
-6. Displays returned prediction and corrective feedback.
+## Running and verifying
 
-## 3. Backend Responsibilities
-
-The backend:
-
-1. Loads trained model artifacts:
-   - `backend/model/posture_model.joblib`
-   - `backend/model/model_meta.json`
-2. Exposes API endpoints:
-   - `GET /health` for service status
-   - `POST /predict` for posture inference
-3. Returns:
-   - label (`proper` or `needs_correction`)
-   - confidence
-   - feedback text
-
-Prediction contract note:
-- `trunk_variance` is required in the current v1 backend contract.
-
-## 4. Training Pipeline
-
-Training uses **tabular features + labels**, not raw images directly.
-
-### Input dataset
-
-`backend/data/posture_dataset.csv` with columns:
-
-- `trunk_angle`
-- `head_forward`
-- `shoulder_tilt`
-- `trunk_variance`
-- `label`
-
-### Training command
+Run the backend from the project root:
 
 ```powershell
-.\.venv\Scripts\python.exe backend/train.py --data backend/data/posture_dataset.csv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn backend.api:app --host 127.0.0.1 --port 8000
 ```
 
-### Output artifacts
+Set `VITE_ML_API_URL=http://127.0.0.1:8000` in the frontend `.env` and run `npm run dev`. The production frontend needs a deployed API URL in the same setting; deploying frontend assets alone does not host the Python model.
 
-- `backend/model/posture_model.joblib`
-- `backend/model/model_meta.json`
+With the original handoff folder available, run:
 
-## 5. Runtime Data Flow
+```powershell
+.\.venv\Scripts\python.exe -m backend.verify_original_model "C:\path\to\original_training_20261014"
+```
 
-Live session flow:
-
-1. Webcam frame captured in frontend.
-2. Front-view framing is checked.
-3. Pose landmarks extracted.
-4. Numeric features computed.
-5. Features sent to backend `/predict`.
-6. Model predicts posture class.
-7. UI shows score + corrective message.
-
-## 6. Deployment Architecture
-
-- **Frontend**: Vercel (`https://sukat-likod.vercel.app`)
-- **Backend**: Render (`https://sukatlikod.onrender.com`)
-
-### Connection setting
-
-In Vercel env vars:
-`VITE_ML_API_URL=https://sukatlikod.onrender.com`
-
-### CORS
-
-Backend allows frontend origin:
-`https://sukat-likod.vercel.app`
-
-## 7. What Is Already Set Up
-
-- Frontend posture UI and webcam processing
-- Feature extraction and feedback display
-- Python training and inference API
-- Frontend-backend integration via env var
-- Render + Vercel deployment path
-- Documentation/guide pages
-
-## 8. What Is Left To Improve
-
-1. Collect more balanced labeled data.
-2. Improve label consistency.
-3. Retrain model after dataset updates.
-4. Redeploy backend with latest model.
-5. Validate in real sessions and iterate.
-
-## 9. Critical Understanding
-
-Model quality depends mostly on the dataset:
-
-- More accurate labels -> better predictions
-- More varied data -> better generalization
-- Continuous retraining loop -> steady improvement
+That check compares all labels and class confidences against the supplied prediction record. See `MODEL_INTEGRATION_PRESENTATION.md` for concise code excerpts and a presentation outline.

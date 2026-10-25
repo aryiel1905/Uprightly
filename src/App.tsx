@@ -33,7 +33,6 @@ import type {
   PoseLandmarkerResult,
 } from "@mediapipe/tasks-vision";
 import { PostureStateCard } from "./components/PostureStateCard";
-import { PostureScoreCard } from "./components/PostureScoreCard";
 import {
   TutorialOverlay,
   type TutorialOverlayStep,
@@ -3047,13 +3046,7 @@ function DesktopApp() {
               Tutorial
             </button>
 
-            <div className="uprightly-desktop-metrics mt-auto grid min-h-0 grid-flow-dense grid-cols-1 grid-rows-2 gap-4">
-              <PostureScoreCard
-                score={score}
-                paused={metricsPaused}
-                theme={theme}
-              />
-
+            <div className="mt-auto">
               <PostureStateCard
                 state={postureDisplayState}
                 message={postureStateMessage}
@@ -3928,13 +3921,7 @@ function DesktopApp() {
         </div>
         </div>
 
-        <div className="grid flex-shrink-0 grid-flow-dense grid-cols-2 gap-3 lg:hidden">
-          <PostureScoreCard
-            score={score}
-            paused={metricsPaused}
-            theme={theme}
-          />
-
+        <div className="flex-shrink-0 lg:hidden">
           <PostureStateCard
             state={postureDisplayState}
             message={postureStateMessage}

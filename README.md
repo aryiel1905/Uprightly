@@ -50,6 +50,6 @@ Repo-specific skills live under [`skills/`](skills/). Start with [skills/INDEX.m
 
 ## Data and model
 
-The tracked CSV files in `backend/data/` contain numeric posture features and labels. The active inference artifact is `backend/model/uprightly_random_forest_python_original_data.joblib`. Keep participant photos, videos, identifying records, and private dataset exports outside the repository. Check consent and source licenses before publishing new training data.
+The tracked CSV files in `backend/data/` contain numeric posture features and labels. The active inference artifact is `backend/model/uprightly_random_forest_corrected_data.joblib`. Keep participant photos, videos, identifying records, and private dataset exports outside the repository. Check consent and source licenses before publishing new training data.
 
 The current prototype evaluates front-view posture only. It is a software demonstration, not a medical diagnosis tool.

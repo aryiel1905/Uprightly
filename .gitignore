@@ -35,8 +35,8 @@ backend/model/
 backend/model/*
 !backend/model/uprightly_random_forest_final.joblib
 !backend/model/uprightly_random_forest_meta.json
-!backend/model/uprightly_random_forest_python_original_data.joblib
-!backend/model/uprightly_random_forest_python_original_data_manifest.json
+!backend/model/uprightly_random_forest_corrected_data.joblib
+!backend/model/uprightly_random_forest_corrected_data_manifest.json
 
 # Local/raw reference data
 Reference/

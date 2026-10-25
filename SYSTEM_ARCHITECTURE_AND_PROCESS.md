@@ -13,8 +13,8 @@ The three model labels are `neutral_posture`, `mild_asymmetry`, and `severe_misa
 
 ## Active model and provenance
 
-- Artifact: `backend/model/uprightly_random_forest_python_original_data.joblib`
-- Manifest: `backend/model/uprightly_random_forest_python_original_data_manifest.json`
+- Artifact: `backend/model/uprightly_random_forest_corrected_data.joblib`
+- Manifest: `backend/model/uprightly_random_forest_corrected_data_manifest.json`
 - Training: a separate Python retraining on 666 original corrected development images. This is not a binary conversion of the RapidMiner `.rmmodel`.
 - Held-out evaluation: 261 images from separate participants; accuracy 76.245%, macro F1 56.023%. Neutral-posture recall was 2/21 (9.52%).
 - Runtime: `backend/requirements.txt` pins scikit-learn 1.9.1 and joblib 1.6.0, the versions recorded with the artifact.

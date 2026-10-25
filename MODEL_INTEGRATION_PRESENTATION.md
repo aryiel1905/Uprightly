@@ -4,7 +4,7 @@
 
 **Webcam frame → MediaPipe landmarks → 35 posture features → FastAPI `/predict` → saved Random Forest pipeline → posture feedback.**
 
-The model is `uprightly_random_forest_python_original_data.joblib`. It is a separately trained scikit-learn pipeline on the original corrected development data, not a conversion of the RapidMiner `.rmmodel`. The pipeline includes median imputation and a 300-tree Random Forest. The backend loads it once at startup; each valid request supplies the 35 named numeric features in the manifest's order.
+The model is `uprightly_random_forest_corrected_data.joblib`. It is a separately trained scikit-learn pipeline on the original corrected development data, not a conversion of the RapidMiner `.rmmodel`. The pipeline includes median imputation and a 300-tree Random Forest. The backend loads it once at startup; each valid request supplies the 35 named numeric features in the manifest's order.
 
 ## Code to copy into slides
 

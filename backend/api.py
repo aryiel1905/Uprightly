@@ -11,8 +11,8 @@ from pydantic import BaseModel, ConfigDict
 from sklearn import __version__ as sklearn_version
 
 MODEL_DIR = Path(__file__).resolve().parent / "model"
-MODEL_PATH = MODEL_DIR / "uprightly_random_forest_python_original_data.joblib"
-META_PATH = MODEL_DIR / "uprightly_random_forest_python_original_data_manifest.json"
+MODEL_PATH = MODEL_DIR / "uprightly_random_forest_corrected_data.joblib"
+META_PATH = MODEL_DIR / "uprightly_random_forest_corrected_data_manifest.json"
 SCHEMA_ID = "uprightly_8point_v1"
 FEATURES = [
     "shoulder_tilt_angle_degrees",

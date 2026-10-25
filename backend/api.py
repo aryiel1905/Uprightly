@@ -8,9 +8,11 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict
+from sklearn import __version__ as sklearn_version
 
-MODEL_PATH = Path("backend/model/uprightly_random_forest_final.joblib")
-META_PATH = Path("backend/model/uprightly_random_forest_meta.json")
+MODEL_DIR = Path(__file__).resolve().parent / "model"
+MODEL_PATH = MODEL_DIR / "uprightly_random_forest_python_original_data.joblib"
+META_PATH = MODEL_DIR / "uprightly_random_forest_python_original_data_manifest.json"
 SCHEMA_ID = "uprightly_8point_v1"
 FEATURES = [
     "shoulder_tilt_angle_degrees",
@@ -132,11 +134,11 @@ def score_from_probabilities(probabilities: dict[str, float]) -> int:
 
 def validate_model(model: object) -> None:
     model_features = list(getattr(model, "feature_names_in_", []))
-    if model_features and model_features != FEATURES:
+    if model_features != FEATURES:
         raise RuntimeError("The model feature schema does not match uprightly_8point_v1.")
 
-    model_classes = {str(value) for value in getattr(model, "classes_", [])}
-    if model_classes != set(CLASSES):
+    model_classes = [str(value) for value in getattr(model, "classes_", [])]
+    if model_classes != CLASSES:
         raise RuntimeError("The model classes do not match Uprightly's three states.")
 
 
@@ -145,15 +147,22 @@ def load_model() -> None:
     global _model
     if not MODEL_PATH.exists():
         raise RuntimeError(f"Model file not found: {MODEL_PATH}")
+    if not META_PATH.exists():
+        raise RuntimeError(f"Model manifest not found: {META_PATH}")
+    metadata = json.loads(META_PATH.read_text(encoding="utf-8"))
+    if metadata.get("feature_schema") != SCHEMA_ID:
+        raise RuntimeError("The model manifest schema ID is not supported.")
+    if metadata.get("feature_names_in_order") != FEATURES:
+        raise RuntimeError("The model manifest feature order is not supported.")
+    if metadata.get("class_order") != CLASSES:
+        raise RuntimeError("The model manifest classes are not supported.")
+    if metadata.get("scikit_learn_version") != sklearn_version:
+        raise RuntimeError("The installed scikit-learn version does not match the model.")
+    if metadata.get("joblib_version") != joblib.__version__:
+        raise RuntimeError("The installed joblib version does not match the model.")
 
     _model = joblib.load(MODEL_PATH)
     validate_model(_model)
-    if META_PATH.exists():
-        metadata = json.loads(META_PATH.read_text(encoding="utf-8"))
-        if metadata.get("schema_id") != SCHEMA_ID:
-            raise RuntimeError("The model metadata schema ID is not supported.")
-        if metadata.get("features") != FEATURES:
-            raise RuntimeError("The model metadata feature order is not supported.")
 
 
 @app.get("/health")

@@ -115,9 +115,6 @@ test("full-card posture tutorial opens with the camera and supports keyboard nav
   await expect(overlay.getByText("Step 1 of 6")).toBeVisible();
   await expect(overlay.locator('[data-tutorial-visual="baseline"]')).toBeVisible();
   await expect(
-    page.getByTestId("desktop-rail").locator('[data-tour="posture-score"]'),
-  ).toHaveCSS("height", "192px");
-  await expect(
     page.getByTestId("desktop-rail").getByTestId("posture-state-card"),
   ).toHaveCSS("height", "192px");
   await expect(
@@ -412,11 +409,9 @@ test("short desktop view keeps the complete rail inside the viewport", async ({
   const rail = page.getByTestId("desktop-rail");
   await expect(rail).toBeVisible();
   const postureState = rail.getByTestId("posture-state-card");
-  const postureScore = rail.locator('[data-tour="posture-score"]');
   await expect(postureState).toBeVisible();
-  await expect(postureScore).toBeVisible();
   await expect(postureState).toHaveCSS("height", "192px");
-  await expect(postureScore).toHaveCSS("height", "192px");
+  await expect(page.getByTestId("posture-score-card")).toHaveCount(0);
   await expect(postureState.getByText("Start a session")).toBeVisible();
   await expect(rail.getByText("Trunk Angle")).toHaveCount(0);
   await expect(rail.getByText("Head Forward")).toHaveCount(0);

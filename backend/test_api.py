@@ -70,5 +70,23 @@ class PredictTests(unittest.TestCase):
             api.validate_model(invalid)
 
 
+class ShippedModelTests(unittest.TestCase):
+    def test_saved_pipeline_loads_and_serves_a_prediction(self) -> None:
+        previous_model = api._model
+        try:
+            api.load_model()
+            self.assertEqual(list(api._model.named_steps), ["imputer", "forest"])
+            self.assertEqual(len(api._model.named_steps["forest"].estimators_), 300)
+
+            response = api.predict(_request())
+            self.assertIn(response.label, api.CLASSES)
+            self.assertAlmostEqual(sum(response.probabilities.values()), 1.0)
+            self.assertAlmostEqual(
+                response.confidence, response.probabilities[response.label]
+            )
+        finally:
+            api._model = previous_model
+
+
 if __name__ == "__main__":
     unittest.main()

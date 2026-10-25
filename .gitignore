@@ -40,3 +40,18 @@ backend/model/*
 
 # Local/raw reference data
 Reference/
+
+# Generated test and Python tool output
+playwright-report/
+test-results/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Participant media and private dataset exports
+dataset/raw_videos/
+dataset/frames/
+dataset/labeled/
+backend/data/private/
+backend/data/raw/
+backend/data/exports/
